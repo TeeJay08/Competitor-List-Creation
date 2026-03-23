@@ -1,0 +1,9 @@
+ASIN | Revenue | Reviews | Rating | Brand | Reason Selected
+B0FKRVLNRK | $24,000.70 | 95 | 4.4 | TRELC | Matches Ideal Sweet Spot Criteria
+B0FVRHQ59G | $12,382.29 | 72 | 4.2 | yespikko | Matches Ideal Sweet Spot Criteria
+B0FDKSVL47 | $10,530.44 | 113 | 4.3 | lovivid | Matches Ideal Sweet Spot Criteria
+B0FJFNZNFR | $403,274.18 | 549 | 4.4 | COCTN | Passed Hard Filters
+B0G3514PQ2 | $45,238.07 | 109 | 4.3 | Paleclouds | Passed Hard Filters
+B0DL41V5C6 | $38,615.40 | 237 | 4.3 | Calories Planet | Passed Hard Filters
+B0FHJLX7YP | $38,433.29 | 48 | 4.3 | KINEOZ | Passed Hard Filters
+B0F541S7LH | $29,216.19 | 161 | 4.4 | YUSAVHO | Passed Hard Filters
