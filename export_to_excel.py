@@ -16,9 +16,11 @@ def export_products_to_excel(products_data, keyword="BATTEL ROPES", filename="co
     ws = wb.active
     ws.title = "Competitors"
     
-    title_str = f"{keyword.upper()} COMPETITORS" if keyword else "COMPETITORS"
+    title_str = f"COMPETITORS {keyword.upper()}" if keyword else "COMPETITORS"
+    ws.merge_cells("B1:K1")
     ws["B1"] = title_str
     ws["B1"].font = Font(name="Lora", bold=True, size=14)
+    ws["B1"].alignment = Alignment(horizontal='center', vertical='center')
     
     for idx, product in enumerate(products_data):
         block_idx = idx // 3
@@ -71,25 +73,8 @@ def export_products_to_excel(products_data, keyword="BATTEL ROPES", filename="co
         img_url = product.get("main_image", "")
         img_cell = set_data(7, "")
         if img_url:
-            try:
-                import requests
-                from openpyxl.drawing.image import Image
-                import io
-                response = requests.get(img_url, timeout=10)
-                if response.status_code == 200:
-                    image_stream = io.BytesIO(response.content)
-                    img = Image(image_stream)
-                    ratio = min(90 / img.width, 90 / img.height)
-                    img.width = int(img.width * ratio)
-                    img.height = int(img.height * ratio)
-                    ws.add_image(img, f"{data_col}{7 + row_offset}")
-                    ws.row_dimensions[7 + row_offset].height = 80
-                else:
-                    img_cell.value = "Image fetch failed"
-            except ImportError:
-                img_cell.value = "Missing Pillow library"
-            except Exception as e:
-                img_cell.value = f"Error: {e}"
+            img_cell.value = f'=_xlfn.IMAGE("{img_url}")'
+            ws.row_dimensions[7 + row_offset].height = 80
         else:
             img_cell.value = "No Image"
         rows_used.append(7 + row_offset)
@@ -140,18 +125,20 @@ def export_products_to_excel(products_data, keyword="BATTEL ROPES", filename="co
             set_data(13, "")
         rows_used.append(13 + row_offset)
         
-        # Row 14: BUY IT WITH
-        set_label(14, "BUY IT WITH")
-        biw = product.get("buy_it_with", [])
-        biw_str = "\n\n".join([f"ASIN: {i.get('asin', '')}\nTitle: {i.get('title', '')}\nAmazon Link: {i.get('amazon_link', '')}" for i in biw]) if biw else ""
-        set_data(14, biw_str, wrap=True)
+        # Row 14: PARENT REVENUE
+        set_label(14, "PARENT REVENUE")
+        pr = product.get("parent_revenue", 0)
+        try: pr = float(pr) if pr else 0.0
+        except ValueError: pr = 0.0
+        set_data(14, f"${pr:,.2f}" if pr else "N/A")
         rows_used.append(14 + row_offset)
         
-        # Row 15: FREQUENTLY BOUGHT TOGETHER
-        set_label(15, "FREQUENTLY BOUGHT TOGETHER")
-        fbt = product.get("frequently_bought_together", [])
-        fbt_str = "\n\n".join([f"ASIN: {i.get('asin', '')}\nTitle: {i.get('title', '')}\nAmazon Link: {i.get('amazon_link', '')}" for i in fbt]) if fbt else ""
-        set_data(15, fbt_str, wrap=True)
+        # Row 15: CHILD REVENUE
+        set_label(15, "CHILD REVENUE")
+        cr = product.get("child_revenue", 0)
+        try: cr = float(cr) if cr else 0.0
+        except ValueError: cr = 0.0
+        set_data(15, f"${cr:,.2f}" if cr else "N/A")
         rows_used.append(15 + row_offset)
         
         # Row 16: SALES RANKS
@@ -168,6 +155,68 @@ def export_products_to_excel(products_data, keyword="BATTEL ROPES", filename="co
             
         ws.column_dimensions[label_col].width = 30
         ws.column_dimensions[data_col].width = 45
+
+    # Sheet 2: FBT
+    fbt_sheet_name = f"FBT {keyword.upper()}"[:31]
+    fbt_ws = wb.create_sheet(title=fbt_sheet_name)
+    
+    fbt_ws.merge_cells("A1:D1")
+    fbt_ws["A1"] = f"FREQUENTLY BOUGHT TOGETHER WITH {keyword.upper()}"
+    fbt_ws["A1"].font = Font(name="Lora", bold=True, size=14)
+    fbt_ws["A1"].alignment = Alignment(horizontal='center', vertical='center')
+    
+    fbt_ws["A3"] = "S.No"
+    fbt_ws["B3"] = "ASIN"
+    fbt_ws["C3"] = "Title"
+    fbt_ws["D3"] = "Amazon Link"
+    
+    for col in "ABCD":
+        fbt_ws[f"{col}3"].font = Font(name="Lora", bold=True, size=10)
+        fbt_ws[f"{col}3"].alignment = Alignment(horizontal='center', vertical='center')
+        apply_solid_border(fbt_ws[f"{col}3"])
+        
+    fbt_ws.column_dimensions["A"].width = 8
+    fbt_ws.column_dimensions["B"].width = 15
+    fbt_ws.column_dimensions["C"].width = 50
+    fbt_ws.column_dimensions["D"].width = 50
+
+    seen_fbt_asins = set()
+    current_row = 4
+    serial_no = 1
+
+    for product in products_data:
+        fbt_list = product.get("frequently_bought_together", [])
+        # Keep products starting from number 2 (index 1)
+        if len(fbt_list) >= 2:
+            for fbt_item in fbt_list[1:]:
+                asin = fbt_item.get("asin")
+                if not asin or asin in seen_fbt_asins:
+                    continue
+                seen_fbt_asins.add(asin)
+                
+                title = fbt_item.get("title", "")
+                link = fbt_item.get("amazon_link", "")
+                
+                cell_sno = fbt_ws[f"A{current_row}"]
+                cell_asin = fbt_ws[f"B{current_row}"]
+                cell_title = fbt_ws[f"C{current_row}"]
+                cell_link = fbt_ws[f"D{current_row}"]
+                
+                cell_sno.value = serial_no
+                cell_asin.value = asin
+                cell_title.value = title
+                cell_link.value = link
+                
+                make_hyperlink(cell_link, link)
+                
+                for c in (cell_sno, cell_asin, cell_title, cell_link):
+                    if c != cell_link:
+                        c.font = Font(name="Arial", size=10)
+                    c.alignment = Alignment(horizontal='center', vertical='center', wrapText=True)
+                    apply_solid_border(c)
+                
+                current_row += 1
+                serial_no += 1
 
     wb.save(filename)
     print(f"Exported to {filename} successfully.")

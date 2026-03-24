@@ -39,10 +39,11 @@ def extract_asins_from_xray(file_path):
     # Try to find necessary columns
     asin_col = next((c for c in df.columns if 'asin' in str(c).lower()), None)
     
-    # Prioritize 'ASIN Revenue' explicitly
-    rev_col = next((c for c in df.columns if 'asin revenue' in str(c).lower()), None)
-    if not rev_col:
-        rev_col = next((c for c in df.columns if 'revenue' in str(c).lower()), None)
+    # Revenue columns
+    child_rev_col = next((c for c in df.columns if 'asin revenue' in str(c).lower()), None)
+    parent_rev_col = next((c for c in df.columns if 'parent level revenue' in str(c).lower()), None)
+    if not parent_rev_col:
+        parent_rev_col = next((c for c in df.columns if 'revenue' in str(c).lower() and 'asin' not in str(c).lower()), None)
         
     reviews_col = next((c for c in df.columns if 'review count' in str(c).lower() or 'reviews' in str(c).lower()), None)
     rating_col = next((c for c in df.columns if 'rating' in str(c).lower() and 'review' in str(c).lower()), None)
@@ -62,8 +63,12 @@ def extract_asins_from_xray(file_path):
         if series is None: return None
         return pd.to_numeric(series.astype(str).replace(r'[$,]', '', regex=True), errors='coerce').fillna(0)
         
-    if rev_col: df['__revenue'] = clean_numeric(df[rev_col])
-    else: df['__revenue'] = 0
+    if child_rev_col: df['__child_revenue'] = clean_numeric(df[child_rev_col])
+    else: df['__child_revenue'] = 0
+    if parent_rev_col: df['__parent_revenue'] = clean_numeric(df[parent_rev_col])
+    else: df['__parent_revenue'] = 0
+    
+    df['__revenue'] = df['__child_revenue'] if child_rev_col else df['__parent_revenue']
     
     if reviews_col: df['__reviews'] = clean_numeric(df[reviews_col])
     else: df['__reviews'] = 0
@@ -85,6 +90,8 @@ def extract_asins_from_xray(file_path):
         seen_asins.add(asin)
             
         rev = row['__revenue']
+        c_rev = row['__child_revenue']
+        p_rev = row['__parent_revenue']
         revs = row['__reviews']
         rating = row['__rating']
         
@@ -115,6 +122,8 @@ def extract_asins_from_xray(file_path):
         shortlisted.append({
             "asin": asin,
             "revenue": rev,
+            "child_revenue": c_rev,
+            "parent_revenue": p_rev,
             "reviews": revs,
             "rating": rating,
             "brand": str(row[brand_col]).strip() if brand_col else None,
@@ -167,7 +176,7 @@ def extract_asins_from_xray(file_path):
     except Exception as e:
         print(f"Could not write to {txt_path}: {e}")
 
-    return [s['asin'] for s in final_selection]
+    return final_selection
 
 def run_xray_mode():
     kw = input("Enter the Keyword (folder name for JSON data): ").strip()
@@ -185,25 +194,27 @@ def run_xray_mode():
         print("File does not exist. Exiting.")
         return
 
-    all_asins = extract_asins_from_xray(file_path)
-    if not all_asins:
+    all_shortlisted = extract_asins_from_xray(file_path)
+    if not all_shortlisted:
         print("No valid ASINs extracted.")
         return
 
-    top_n_str = input(f"Found {len(all_asins)} available ASINs. How many top ASINs to process? (default: 10): ").strip()
+    top_n_str = input(f"Found {len(all_shortlisted)} available ASINs. How many top ASINs to process? (default: 10): ").strip()
     top_n = int(top_n_str) if top_n_str.isdigit() else 10
     
-    asins = all_asins[:top_n]
+    selected_data = all_shortlisted[:top_n]
+    asins = [d['asin'] for d in selected_data]
     print(f"\nShortlisted ASINs: {', '.join(asins)}\n")
 
     force_sec_input = input("Force re-download of variations and related items as well? (y/n): ").strip().lower()
     force_secondary = force_sec_input in ['y', 'yes']
 
-    execute_fetch_pipeline(current_keyword, asins, force_secondary)
+    execute_fetch_pipeline(current_keyword, asins, force_secondary, selected_data)
 
-def execute_fetch_pipeline(current_keyword, asins, force_secondary):
+def execute_fetch_pipeline(current_keyword, asins, force_secondary, xray_metadata=None):
     # This must set the global current_keyword in fetch_and_save_json
     import fetch_and_save_json
+    import json
     fetch_and_save_json.current_keyword = current_keyword
 
     keyword_dir = os.path.join(BASE_JSON_DIR, current_keyword)
@@ -213,6 +224,11 @@ def execute_fetch_pipeline(current_keyword, asins, force_secondary):
     main_asins_filepath = os.path.join(keyword_dir, "main_asins.txt")
     with open(main_asins_filepath, "w", encoding="utf-8") as f:
         f.write(",".join(asins))
+        
+    if xray_metadata:
+        meta_filepath = os.path.join(keyword_dir, "xray_metadata.json")
+        with open(meta_filepath, "w", encoding="utf-8") as f:
+            json.dump(xray_metadata, f, indent=4)
 
     for idx, target_asin in enumerate(asins):
         print(f"\n[{idx+1}/{len(asins)}] Starting ASIN workflow: {target_asin}")

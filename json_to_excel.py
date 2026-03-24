@@ -161,11 +161,26 @@ if __name__ == "__main__":
 
     excel_title = input("Enter the Keyword for the Excel heading (can be same as folder name): ").strip()
 
+    xray_metadata = {}
+    meta_file = os.path.join(current_keyword_dir, "xray_metadata.json")
+    if os.path.exists(meta_file):
+        with open(meta_file, "r", encoding="utf-8") as f:
+            try:
+                x_list = json.load(f)
+                for item in x_list:
+                    xray_metadata[item.get("asin")] = item
+            except json.JSONDecodeError:
+                pass
+
     all_data = []
     for idx, target_asin in enumerate(asins):
         print(f"[{idx+1}/{len(asins)}] Parsing JSON for ASIN: {target_asin}")
         product_data = process_product_from_json(target_asin)
         if product_data:
+            if target_asin in xray_metadata:
+                x_data = xray_metadata[target_asin]
+                product_data["parent_revenue"] = x_data.get("parent_revenue", 0)
+                product_data["child_revenue"] = x_data.get("child_revenue", 0)
             all_data.append(product_data)
             
     if all_data:
