@@ -1,0 +1,5 @@
+Starting LLM filter for file: temp_Helium_10_Xray_2026-03-30.csv
+OPENAI_API_KEY present: True
+Columns mapped - ASIN: ASIN, Title: Product Details, Brand: Brand
+LLM returned 15 valid ASINs.
+Saved successfully to filtered_xray\filtered_Knife_Sharpener_2026-03-31_01-35-10.xlsx

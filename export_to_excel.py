@@ -1,6 +1,10 @@
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Border, Side, Font
+from openpyxl.drawing.image import Image as OpenpyxlImage
+import requests
+import io
+
 
 def apply_solid_border(cell):
     thin = Side(border_style="thin", color="000000")
@@ -73,7 +77,18 @@ def export_products_to_excel(products_data, keyword="BATTEL ROPES", filename="co
         img_url = product.get("main_image", "")
         img_cell = set_data(7, "")
         if img_url:
-            img_cell.value = f'=_xlfn.IMAGE("{img_url}")'
+            try:
+                response = requests.get(img_url, timeout=5)
+                if response.status_code == 200:
+                    img_data = io.BytesIO(response.content)
+                    img = OpenpyxlImage(img_data)
+                    # Scale image down to fit cell roughly
+                    img.width, img.height = 100, 100
+                    ws.add_image(img, img_cell.coordinate)
+                else:
+                    img_cell.value = "Image Check Failed"
+            except Exception:
+                img_cell.value = "Image Download Err"
             ws.row_dimensions[7 + row_offset].height = 80
         else:
             img_cell.value = "No Image"
