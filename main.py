@@ -153,8 +153,8 @@ def extract_asins_from_xray(file_path):
             
         brand_filtered_shortlisted.append(s)
         
-    # Take top 5-8 ASINs (we'll just take top 8 max)
-    final_selection = brand_filtered_shortlisted[:8]
+    # Take top 8-10 ASINs (we'll just take top 10 max)
+    final_selection = brand_filtered_shortlisted[:10]
     
     print("\n### Section A — Filtered Out ASINs ###")
     for asin, reason in filtered_out:
